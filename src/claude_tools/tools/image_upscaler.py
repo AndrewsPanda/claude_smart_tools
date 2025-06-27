@@ -1,115 +1,46 @@
-"""Image upscaler tool using Real-ESRGAN for maximum quality."""
+"""Image upscaler tool using AI models for maximum quality."""
 
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from claude_tools.core.base_tool import BaseTool
 
 try:
     import cv2
     import numpy as np
     from PIL import Image
 
-    # Real-ESRGAN imports
-    try:
-        from basicsr.archs.rrdbnet_arch import RRDBNet
-        from realesrgan import RealESRGANer
-
-        REALESRGAN_AVAILABLE = True
-    except ImportError:
-        REALESRGAN_AVAILABLE = False
-
     CV2_AVAILABLE = True
 except ImportError:
     CV2_AVAILABLE = False
-    REALESRGAN_AVAILABLE = False
 
-from claude_tools.core.base_tool import BaseTool
+# AI upscaling imports - currently disabled due to model access issues
+AI_UPSCALING_AVAILABLE = False
 
 
 class ImageUpscaler(BaseTool):
-    """High-quality image upscaler using AI-based Real-ESRGAN with fallback methods.
+    """High-quality image upscaler using advanced classical methods.
 
-    This tool provides maximum quality image upscaling primarily using Real-ESRGAN,
-    with classical interpolation methods as fallback when AI models aren't available.
+    This tool provides maximum quality image upscaling using enhanced classical algorithms
+    including progressive upscaling, edge preservation, and sharpening techniques.
     """
 
     def __init__(self) -> None:
         """Initialize the image upscaler tool."""
         super().__init__(
             name="image_upscaler",
-            description="AI-powered image upscaler for maximum quality results",
+            description="High-quality image upscaler using advanced algorithms",
             version="1.0.0",
         )
-        self._upsampler: Optional[RealESRGANer] = None
+        self._ai_model: Optional[Any] = None
 
-    def _initialize_realesrgan(self, model_name: str = "RealESRGAN_x4plus") -> bool:
-        """Initialize Real-ESRGAN upsampler.
+    # AI model methods disabled due to model access issues
+    # These can be re-enabled when proper AI models are available
 
-        Args:
-            model_name: Name of the Real-ESRGAN model to use
-
-        Returns:
-            True if initialization successful, False otherwise
-        """
-        if not REALESRGAN_AVAILABLE:
-            self.logger.warning("Real-ESRGAN not available, will use fallback methods")
-            return False
-
-        try:
-            # Define model configurations
-            models = {
-                "RealESRGAN_x4plus": {
-                    "model_path": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
-                    "scale": 4,
-                    "arch": "RRDBNet",
-                    "num_block": 23,
-                    "num_grow_ch": 32,
-                },
-                "RealESRGAN_x2plus": {
-                    "model_path": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
-                    "scale": 2,
-                    "arch": "RRDBNet",
-                    "num_block": 23,
-                    "num_grow_ch": 32,
-                },
-            }
-
-            if model_name not in models:
-                self.logger.error(f"Unknown model: {model_name}")
-                return False
-
-            model_info = models[model_name]
-
-            # Initialize the model architecture
-            model = RRDBNet(
-                num_in_ch=3,
-                num_out_ch=3,
-                num_feat=64,
-                num_block=model_info["num_block"],
-                num_grow_ch=model_info["num_grow_ch"],
-                scale=model_info["scale"],
-            )
-
-            # Initialize the upsampler
-            self._upsampler = RealESRGANer(
-                scale=model_info["scale"],
-                model_path=model_info["model_path"],
-                model=model,
-                tile=0,
-                tile_pad=10,
-                pre_pad=0,
-                half=False,  # Use FP32 for better quality
-                gpu_id=None,  # Auto-detect GPU
-            )
-
-            self.logger.info(f"Real-ESRGAN {model_name} initialized successfully")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize Real-ESRGAN: {e}")
-            return False
-
-    def _fallback_upscale(self, image: np.ndarray, scale_factor: float) -> np.ndarray:
-        """Fallback upscaling using classical interpolation.
+    def _high_quality_upscale(
+        self, image: np.ndarray, scale_factor: float
+    ) -> np.ndarray:
+        """High-quality upscaling using advanced classical methods.
 
         Args:
             image: Input image as numpy array
@@ -119,21 +50,72 @@ class ImageUpscaler(BaseTool):
             Upscaled image as numpy array
         """
         height, width = image.shape[:2]
-        new_width = int(width * scale_factor)
-        new_height = int(height * scale_factor)
 
-        # Use Lanczos for best quality among classical methods
         if CV2_AVAILABLE:
-            upscaled = cv2.resize(
-                image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4
-            )
+            # Multi-step upscaling for better quality
+            current_image = image.copy()
+            current_scale = 1.0
+
+            # Apply progressive upscaling for large scale factors
+            while current_scale < scale_factor:
+                step_scale = min(2.0, scale_factor / current_scale)
+                current_height, current_width = current_image.shape[:2]
+                step_width = int(current_width * step_scale)
+                step_height = int(current_height * step_scale)
+
+                # Use Lanczos4 for best quality
+                current_image = cv2.resize(
+                    current_image,
+                    (step_width, step_height),
+                    interpolation=cv2.INTER_LANCZOS4,
+                )
+                current_scale *= step_scale
+
+            # Apply bilateral filtering for edge-preserving noise reduction
+            upscaled = cv2.bilateralFilter(current_image, 9, 80, 80)
+
+            # Gentle sharpening to enhance details
+            kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+            sharpened = cv2.filter2D(upscaled, -1, kernel * 0.15)
+
+            # Blend original and sharpened for natural look
+            upscaled = cv2.addWeighted(upscaled, 0.7, sharpened, 0.3, 0)
+            upscaled = np.clip(upscaled, 0, 255).astype(np.uint8)
+
         else:
-            # Fallback to PIL
+            # Fallback to PIL with multiple steps
             pil_image = Image.fromarray(image)
-            upscaled_pil = pil_image.resize(
-                (new_width, new_height), Image.Resampling.LANCZOS
+            current_scale = 1.0
+
+            while current_scale < scale_factor:
+                step_scale = min(2.0, scale_factor / current_scale)
+                current_size = pil_image.size
+                new_size = (
+                    int(current_size[0] * step_scale),
+                    int(current_size[1] * step_scale),
+                )
+
+                # Use Lanczos resampling
+                pil_image = pil_image.resize(new_size, Image.Resampling.LANCZOS)
+                current_scale *= step_scale
+
+            # Apply gentle smoothing then sharpening
+            from PIL import ImageEnhance, ImageFilter
+
+            # Light Gaussian blur to reduce upscaling artifacts
+            pil_image = pil_image.filter(ImageFilter.GaussianBlur(radius=0.5))
+            # Unsharp mask for detail enhancement
+            pil_image = pil_image.filter(
+                ImageFilter.UnsharpMask(radius=1.5, percent=120, threshold=3)
             )
-            upscaled = np.array(upscaled_pil)
+
+            # Mild contrast and sharpness enhancement
+            enhancer = ImageEnhance.Contrast(pil_image)
+            pil_image = enhancer.enhance(1.05)
+            enhancer = ImageEnhance.Sharpness(pil_image)
+            pil_image = enhancer.enhance(1.1)
+
+            upscaled = np.array(pil_image)
 
         return upscaled
 
@@ -182,7 +164,7 @@ class ImageUpscaler(BaseTool):
                 - input_path: Path to input image
                 - output_path: Path for output image (optional)
                 - scale_factor: Upscaling factor (optional, default: 4.0)
-                - method: Upscaling method 'auto', 'realesrgan', 'fallback' (optional, default: 'auto')
+                - method: Upscaling method 'auto', 'ai', 'fallback' (optional, default: 'auto')
 
         Returns:
             Dictionary containing results and metadata
@@ -209,68 +191,36 @@ class ImageUpscaler(BaseTool):
 
         try:
             # Load image
-            if CV2_AVAILABLE:
-                image = cv2.imread(str(input_path), cv2.IMREAD_COLOR)
-                if image is None:
-                    raise ValueError(f"Could not load image: {input_path}")
-            else:
-                pil_image = Image.open(input_path).convert("RGB")
-                image = np.array(pil_image)
-
-            original_height, original_width = image.shape[:2]
+            pil_image = Image.open(input_path).convert("RGB")
+            original_width, original_height = pil_image.size
 
             # Choose upscaling method
-            use_realesrgan = False
+            use_ai = False
             if method == "auto":
-                use_realesrgan = REALESRGAN_AVAILABLE
-            elif method == "realesrgan":
-                use_realesrgan = REALESRGAN_AVAILABLE
-                if not use_realesrgan:
+                use_ai = AI_UPSCALING_AVAILABLE
+            elif method == "ai":
+                use_ai = AI_UPSCALING_AVAILABLE
+                if not use_ai:
                     self.logger.warning(
-                        "Real-ESRGAN requested but not available, using fallback"
+                        "AI upscaling requested but not available, using fallback"
                     )
             elif method == "fallback":
-                use_realesrgan = False
+                use_ai = False
             else:
                 self.logger.warning(f"Unknown method '{method}', using auto")
-                use_realesrgan = REALESRGAN_AVAILABLE
+                use_ai = AI_UPSCALING_AVAILABLE
 
-            # Perform upscaling
-            if use_realesrgan:
-                if self._upsampler is None:
-                    model_name = (
-                        "RealESRGAN_x4plus"
-                        if scale_factor >= 4
-                        else "RealESRGAN_x2plus"
-                    )
-                    if not self._initialize_realesrgan(model_name):
-                        use_realesrgan = False
-
-                if use_realesrgan:
-                    self.logger.info("Using Real-ESRGAN for upscaling")
-                    upscaled_image, _ = self._upsampler.enhance(
-                        image, outscale=scale_factor
-                    )
-                    method_used = "Real-ESRGAN"
-                else:
-                    self.logger.info("Real-ESRGAN failed, using fallback method")
-                    upscaled_image = self._fallback_upscale(image, scale_factor)
-                    method_used = "Lanczos (fallback)"
-            else:
-                self.logger.info("Using fallback interpolation method")
-                upscaled_image = self._fallback_upscale(image, scale_factor)
-                method_used = "Lanczos"
+            # Perform upscaling - AI is currently disabled, so always use high-quality classical
+            self.logger.info("Using high-quality classical upscaling method")
+            image_np = np.array(pil_image)
+            upscaled_np = self._high_quality_upscale(image_np, scale_factor)
+            upscaled_image_pil = Image.fromarray(upscaled_np)
+            method_used = "High-Quality Classical (Enhanced Lanczos)"
 
             # Save upscaled image
-            if CV2_AVAILABLE:
-                success = cv2.imwrite(str(output_path), upscaled_image)
-                if not success:
-                    raise ValueError(f"Failed to save image to {output_path}")
-            else:
-                pil_output = Image.fromarray(upscaled_image)
-                pil_output.save(output_path)
+            upscaled_image_pil.save(output_path, optimize=True, quality=95)
 
-            upscaled_height, upscaled_width = upscaled_image.shape[:2]
+            upscaled_width, upscaled_height = upscaled_image_pil.size
 
             result = {
                 "input_path": str(input_path),

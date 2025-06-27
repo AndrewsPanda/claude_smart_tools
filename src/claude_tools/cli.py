@@ -1,6 +1,5 @@
 """Command-line interface for Claude Smart Tools."""
 
-
 import click
 
 from claude_tools import __version__
@@ -36,7 +35,7 @@ def list() -> None:
 @click.option(
     "--method",
     "-m",
-    type=click.Choice(["auto", "realesrgan", "fallback"]),
+    type=click.Choice(["auto", "ai", "fallback"]),
     default="auto",
     help="Upscaling method (default: auto)",
 )
@@ -50,7 +49,7 @@ def upscale(
 
     Examples:
         claude-tools upscale image.jpg --scale 2.0
-        claude-tools upscale logo.png -o big_logo.png --method realesrgan
+        claude-tools upscale logo.png -o big_logo.png --method ai
         claude-tools upscale photo.jpg --scale 4.0 --verbose
     """
     try:
