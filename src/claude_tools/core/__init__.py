@@ -1,0 +1,1 @@
+"""Core functionality shared across all tools."""
