@@ -1,7 +1,9 @@
 """Pytest configuration and fixtures."""
-import pytest
-from pathlib import Path
+
 import sys
+from pathlib import Path
+
+import pytest
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"
@@ -11,11 +13,7 @@ sys.path.insert(0, str(src_path))
 @pytest.fixture
 def sample_config():
     """Provide a sample configuration for testing."""
-    return {
-        "debug": True,
-        "timeout": 30,
-        "retry_count": 3
-    }
+    return {"debug": True, "timeout": 30, "retry_count": 3}
 
 
 @pytest.fixture

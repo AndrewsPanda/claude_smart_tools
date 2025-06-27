@@ -2,3 +2,14 @@
 pydantic>=2.0
 click>=8.0
 rich>=13.0
+
+# Image processing dependencies
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# AI upscaling (optional - install manually if needed)
+# realesrgan>=0.3.0
+# basicsr>=1.4.2
+# torch>=2.0.0
+# torchvision>=0.15.0
